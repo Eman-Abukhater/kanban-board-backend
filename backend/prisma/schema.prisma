@@ -4,12 +4,129 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
-}
-
+// prisma/schema.prisma
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  admin
+  employee
+}
+
+model User {
+  user_id       Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password_hash String
+  role          Role
+
+  tasks         Task[]   @relation("TaskAssignee")
+  boardMembers  BoardMember[]
+  projectMembers ProjectMember[]
+
+}
+
+model SqlProject {
+  project_id   Int      @id @default(autoincrement())
+  project_name String
+  description  String? 
+  status       String   @default("open")
+
+  boards       Board[]
+  members      ProjectMember[]
+}
+
+model ProjectMember {
+  member_id  Int       @id @default(autoincrement())
+  project    SqlProject @relation(fields: [project_id], references: [project_id])
+  project_id Int
+  user       User      @relation(fields: [user_id], references: [user_id])
+  user_id    Int
+  role       Role
+}
+
+model Board {
+  board_id   Int       @id @default(autoincrement())
+  fkboardid  String    @unique @default(uuid()) // public GUID used by your UI
+  project    SqlProject @relation(fields: [project_id], references: [project_id])
+  project_id Int
+
+  title       String
+  description String? 
+  status      String   @default("open")
+  progress    Int      @default(0)
+  created_at  DateTime @default(now())
+  addedby     String
+  addedbyid   Int
+
+  lists        List[]
+  boardMembers BoardMember[]
+}
+
+model BoardMember {
+  board_id Int
+  user_id  Int
+  board    Board @relation(fields: [board_id], references: [board_id])
+  user     User  @relation(fields: [user_id], references: [user_id])
+
+  @@id([board_id, user_id])
+}
+
+model List {
+  list_id   String  @id @default(uuid())
+  board     Board   @relation(fields: [board_id], references: [board_id])
+  board_id  Int
+  list_name String
+  position  Int
+
+  cards     Card[]
+}
+
+model Card {
+  card_id     String  @id @default(uuid())
+  list        List    @relation(fields: [list_id], references: [list_id])
+  list_id     String
+  title       String
+  description String? 
+  position    Int
+  image_url   String? 
+  start_date  DateTime?
+  end_date    DateTime?
+
+  tasks  Task[]
+  tags   Tag[]
+  comments Comment[]
+}
+
+model Task {
+  task_id    String  @id @default(uuid())
+  card       Card    @relation(fields: [card_id], references: [card_id])
+  card_id    String
+  task_name  String
+  status     String  @default("todo")
+  assignee   User?   @relation("TaskAssignee", fields: [assigned_to], references: [user_id])
+  assigned_to Int?
+}
+
+model Tag {
+  tag_id  String @id @default(uuid())
+  card    Card   @relation(fields: [card_id], references: [card_id])
+  card_id String
+  title   String
+  color   String?
+}
+
+model Comment {
+  comment_id String  @id @default(uuid())
+  card       Card    @relation(fields: [card_id], references: [card_id])
+  card_id    String
+  author     String
+  message    String
+  created_at DateTime @default(now())
 }
