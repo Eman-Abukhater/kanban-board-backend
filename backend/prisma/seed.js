@@ -30,7 +30,6 @@ async function main() {
     },
   });
 
-  // project 1001 to match your BoardList fkpoid
   const project = await prisma.sqlProject.upsert({
     where: { project_id: 1001 },
     update: {},
