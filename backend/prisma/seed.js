@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 async function main() {
-  // users
+  
   const adminPass = await bcrypt.hash('admin123', 10);
   const empPass = await bcrypt.hash('employee123', 10);
 
