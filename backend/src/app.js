@@ -231,6 +231,69 @@ app.delete('/boards/:boardid', async (req, res) => {
   }
 });
 
+// Kanabn API 
+// GET /boards/:fkboardid/kanban  -> { lists, board: { title, fkboardid, status }, progress }
+app.get('/boards/:fkboardid/kanban', async (req, res) => {
+  const { fkboardid } = req.params;
+  try {
+    const board = await prisma.board.findUnique({
+      where: { fkboardid },
+      include: {
+        lists: {
+          orderBy: { position: 'asc' },
+          include: {
+            cards: {
+              orderBy: { position: 'asc' },
+              include: { tasks: true, tags: true, comments: true }
+            }
+          }
+        }
+      }
+    });
+    if (!board) return res.status(404).json({ error: 'board not found' });
+
+    const lists = board.lists.map(l => ({
+      list_id: l.list_id,
+      list_name: l.list_name,
+      position: l.position,
+      cards: l.cards.map(c => ({
+        card_id: c.card_id,
+        list_id: l.list_id,
+        title: c.title,
+        description: c.description || '',
+        position: c.position,
+        imageUrl: c.image_url || null,
+        startDate: c.start_date ? c.start_date.toISOString() : null,
+        endDate: c.end_date ? c.end_date.toISOString() : null,
+        tasks: (c.tasks || []).map(t => ({
+          task_id: t.task_id,
+          task_name: t.task_name,
+          status: t.status === 'done' ? 'done' : 'todo',
+          assigneeId: t.assigned_to ?? undefined,
+        })),
+        tags: (c.tags || []).map(t => ({ id: t.tag_id, title: t.title, color: t.color || undefined })),
+        comments: (c.comments || []).map(cm => ({
+          id: cm.comment_id,
+          author: cm.author,
+          message: cm.message,
+          createdAt: cm.created_at.toISOString(),
+        })),
+      })),
+    }));
+
+    // simple progress = % of cards in "Done"
+    const totalCards = lists.reduce((n, l) => n + l.cards.length, 0);
+    const done = lists.find(l => l.list_name.trim().toLowerCase() === 'done');
+    const progress = totalCards ? Math.round(((done?.cards.length || 0) / totalCards) * 100) : 0;
+
+    res.json({ lists, board: { title: board.title, fkboardid: board.fkboardid, status: board.status }, progress });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to load kanban' });
+  }
+});
+
+
 // health
 app.get('/', (_, res) => res.send('kanban backend OK'));
 
