@@ -453,6 +453,54 @@ app.patch('/cards/move', async (req, res) => {
   }
 });
 
+// PUT /cards/:cardId  (multipart/form-data)
+// fields: title, desc, startDate, endDate, completed ("true"/"false"), fkboardid, listid
+app.put('/cards/:cardId', upload.single('uploadImage'), async (req, res) => {
+  const { cardId } = req.params;
+  const { title, desc, startDate, endDate, completed } = req.body || {};
+  const file = req.file; // optional
+
+  try {
+    const data = {};
+    if (typeof title === 'string') data.title = title;
+    if (typeof desc === 'string') data.description = desc;
+    if (typeof startDate === 'string' && startDate) data.start_date = new Date(startDate);
+    else if (startDate === '') data.start_date = null;
+    if (typeof endDate === 'string' && endDate) data.end_date = new Date(endDate);
+    else if (endDate === '') data.end_date = null;
+    if (file) data.image_url = `/uploads/${file.filename}`;
+
+    const updated = await prisma.card.update({ where: { card_id: cardId }, data });
+
+    // completed -> mark all subtasks done/undo
+    if (typeof completed === 'string') {
+      const isDone = completed === 'true';
+      const tasks = await prisma.task.findMany({ where: { card_id: cardId } });
+      for (const t of tasks) {
+        await prisma.task.update({ where: { task_id: t.task_id }, data: { status: isDone ? 'done' : 'todo' } });
+      }
+    }
+
+    res.json({
+      card_id: updated.card_id,
+      list_id: updated.list_id,
+      title: updated.title,
+      description: updated.description || '',
+      position: updated.position,
+      imageUrl: updated.image_url || null,
+      startDate: updated.start_date ? updated.start_date.toISOString() : null,
+      endDate: updated.end_date ? updated.end_date.toISOString() : null
+    });
+  } catch (e) {
+    if (e.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'file too large' });
+    console.error(e);
+    res.status(500).json({ error: 'failed to edit card' });
+  }
+});
+
+// serve uploaded files
+app.use('/uploads', express.static(UPLOAD_DIR));
+
 
 // health
 app.get('/', (_, res) => res.send('kanban backend OK'));
