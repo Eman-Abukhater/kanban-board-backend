@@ -2,17 +2,23 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
-
+//  configure multer for file uploads
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const app = express();
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+function toPublicUrl(p) {
+  if (!p) return null;
+  if (p.startsWith('http://') || p.startsWith('https://')) return p;
+  return `${PUBLIC_BASE_URL}${p.startsWith('/') ? p : `/${p}`}`;
+}
+
 const prisma = new PrismaClient();
 
 const PORT = process.env.PORT || 4000;
 const origins = (process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
 
-//  configure multer for file uploads
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -275,7 +281,7 @@ app.get('/boards/:fkboardid/kanban', async (req, res) => {
         title: c.title,
         description: c.description || '',
         position: c.position,
-        imageUrl: c.image_url || null,
+        imageUrl: toPublicUrl(c.image_url) || null,
         startDate: c.start_date ? c.start_date.toISOString() : null,
         endDate: c.end_date ? c.end_date.toISOString() : null,
         tasks: (c.tasks || []).map(t => ({
@@ -487,7 +493,7 @@ app.put('/cards/:cardId', upload.single('uploadImage'), async (req, res) => {
       title: updated.title,
       description: updated.description || '',
       position: updated.position,
-      imageUrl: updated.image_url || null,
+      imageUrl: toPublicUrl(updated.image_url) || null,
       startDate: updated.start_date ? updated.start_date.toISOString() : null,
       endDate: updated.end_date ? updated.end_date.toISOString() : null
     });
