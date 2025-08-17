@@ -9,6 +9,19 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 4000;
 const origins = (process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
 
+//  configure multer for file uploads
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({
+  dest: UPLOAD_DIR,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
 app.use(cors({
   origin: function(origin, cb) {
     if (!origin || origins.length === 0 || origins.includes(origin)) return cb(null, true);
