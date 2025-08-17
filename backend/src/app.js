@@ -293,6 +293,26 @@ app.get('/boards/:fkboardid/kanban', async (req, res) => {
   }
 });
 
+// POST /boards/:fkboardid/lists  body: { list_name }
+app.post('/boards/:fkboardid/lists', async (req, res) => {
+  const { fkboardid } = req.params;
+  const { list_name } = req.body || {};
+  if (!list_name) return res.status(400).json({ error: 'list_name required' });
+  try {
+    const board = await prisma.board.findUnique({ where: { fkboardid } });
+    if (!board) return res.status(404).json({ error: 'board not found' });
+
+    const count = await prisma.list.count({ where: { board_id: board.board_id } });
+    const created = await prisma.list.create({
+      data: { board_id: board.board_id, list_name: String(list_name), position: count }
+    });
+    res.json({ list_id: created.list_id, list_name: created.list_name, position: created.position, cards: [] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to add list' });
+  }
+});
+
 
 // health
 app.get('/', (_, res) => res.send('kanban backend OK'));
