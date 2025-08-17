@@ -35,6 +35,20 @@ app.get('/members', async (req, res) => {
   }
 });
 
+// GET /projects -> [{ id, name }]
+app.get('/projects', async (req, res) => {
+  try {
+    const projects = await prisma.sqlProject.findMany({
+      orderBy: { project_id: 'asc' },
+      select: { project_id: true, project_name: true },
+    });
+    res.json(projects.map(p => ({ id: p.project_id, name: p.project_name })));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to fetch projects' });
+  }
+});
+
 // GET /projects/:fkpoid/boards -> BoardRow[]
 app.get('/projects/:fkpoid/boards', async (req, res) => {
   const fkpoid = Number(req.params.fkpoid);
