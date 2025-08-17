@@ -392,6 +392,53 @@ app.delete('/cards/:cardId', async (req, res) => {
   }
 });
 
+// PATCH /lists/reorder  body: { board_id, from_list_id, to_list_id, from_index, to_index }
+app.patch('/lists/reorder', async (req, res) => {
+  const { board_id, from_list_id, to_list_id, from_index, to_index } = req.body || {};
+  try {
+    const lists = await prisma.list.findMany({ where: { board_id }, orderBy: { position: 'asc' } });
+    const from = lists.findIndex(l => l.list_id === from_list_id);
+    const to   = lists.findIndex(l => l.list_id === to_list_id);
+    if (from === -1 || to === -1) return res.status(404).json({ error: 'list not found' });
+
+    const arr = [...lists];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].position !== i) {
+        await prisma.list.update({ where: { list_id: arr[i].list_id }, data: { position: i } });
+      }
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to reorder lists' });
+  }
+});
+
+// PATCH /cards/move  body: { card_id, source_list_id, dest_list_id, source_index, dest_index }
+app.patch('/cards/move', async (req, res) => {
+  const { card_id, source_list_id, dest_list_id, source_index, dest_index } = req.body || {};
+  try {
+    // move card list_id
+    await prisma.card.update({ where: { card_id }, data: { list_id: dest_list_id } });
+
+    // reindex both lists
+    const src = await prisma.card.findMany({ where: { list_id: source_list_id }, orderBy: { position: 'asc' } });
+    for (let i = 0; i < src.length; i++) {
+      await prisma.card.update({ where: { card_id: src[i].card_id }, data: { position: i } });
+    }
+    const dst = await prisma.card.findMany({ where: { list_id: dest_list_id }, orderBy: { position: 'asc' } });
+    for (let i = 0; i < dst.length; i++) {
+      await prisma.card.update({ where: { card_id: dst[i].card_id }, data: { position: i } });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to move card' });
+  }
+});
 
 
 // health
