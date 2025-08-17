@@ -312,6 +312,86 @@ app.post('/boards/:fkboardid/lists', async (req, res) => {
     res.status(500).json({ error: 'failed to add list' });
   }
 });
+// DELETE /lists/:listId
+app.delete('/lists/:listId', async (req, res) => {
+  const { listId } = req.params;
+  try {
+    // delete list -> cards -> subtables
+    const cards = await prisma.card.findMany({ where: { list_id: listId } });
+    for (const c of cards) {
+      await prisma.task.deleteMany({ where: { card_id: c.card_id } });
+      await prisma.tag.deleteMany({ where: { card_id: c.card_id } });
+      await prisma.comment.deleteMany({ where: { card_id: c.card_id } });
+    }
+    await prisma.card.deleteMany({ where: { list_id: listId } });
+    const deleted = await prisma.list.delete({ where: { list_id: listId } });
+
+    // reindex positions on the board
+    const lists = await prisma.list.findMany({
+      where: { board_id: deleted.board_id }, orderBy: { position: 'asc' }
+    });
+    for (let i = 0; i < lists.length; i++) {
+      if (lists[i].position !== i) {
+        await prisma.list.update({ where: { list_id: lists[i].list_id }, data: { position: i } });
+      }
+    }
+    res.json({ deleted: listId });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to delete list' });
+  }
+});
+
+// POST /lists/:listId/cards  body: { title }
+app.post('/lists/:listId/cards', async (req, res) => {
+  const { listId } = req.params;
+  const { title } = req.body || {};
+  if (!title) return res.status(400).json({ error: 'title required' });
+  try {
+    const count = await prisma.card.count({ where: { list_id: listId } });
+    const created = await prisma.card.create({
+      data: {
+        list_id: listId,
+        title: String(title),
+        position: count,
+      }
+    });
+    res.json({
+      card_id: created.card_id, list_id: created.list_id, title: created.title,
+      description: created.description || '', position: created.position,
+      imageUrl: created.image_url || null, tasks: [], startDate: null, endDate: null, tags: [], comments: []
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to add card' });
+  }
+});
+
+// DELETE /cards/:cardId
+app.delete('/cards/:cardId', async (req, res) => {
+  const { cardId } = req.params;
+  try {
+    await prisma.task.deleteMany({ where: { card_id: cardId } });
+    await prisma.tag.deleteMany({ where: { card_id: cardId } });
+    await prisma.comment.deleteMany({ where: { card_id: cardId } });
+    const deleted = await prisma.card.delete({ where: { card_id: cardId } });
+
+    // reindex positions in that list
+    const cards = await prisma.card.findMany({
+      where: { list_id: deleted.list_id }, orderBy: { position: 'asc' }
+    });
+    for (let i = 0; i < cards.length; i++) {
+      if (cards[i].position !== i) {
+        await prisma.card.update({ where: { card_id: cards[i].card_id }, data: { position: i } });
+      }
+    }
+    res.json({ deleted: cardId });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'failed to delete card' });
+  }
+});
+
 
 
 // health
