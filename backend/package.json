@@ -7,7 +7,9 @@
     "start": "node src/app.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "postinstall": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy"
   },
   "keywords": [],
   "author": "",
