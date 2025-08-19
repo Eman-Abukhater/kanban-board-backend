@@ -9,7 +9,8 @@
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
     "postinstall": "prisma generate",
-    "migrate:deploy": "prisma migrate deploy"
+    "migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed"
   },
   "keywords": [],
   "author": "",
